@@ -349,6 +349,31 @@ The emulator core is GPL-3.0 (RetroArch) and MPL-2.0 (mGBA). `web/licenses.txt`
 lists all third-party components with links to their source, and the page
 footer links to it.
 
+## Hidden team editor
+
+Press the Konami code on the title card (↑ ↑ ↓ ↓ ← → ← → B A, on the keyboard
+or the touch pad; the keyboard's B is the `b` key) to open an editor for your
+team. Pick up to six Pokémon, their moves (only ones they can learn, unless you
+tick the box), held item, level, nature, IVs and EVs. A live preview shows the
+final stats. **Save and use** keeps the team in your browser and the title card
+says "Custom team in use". **Use the daily team** goes back to the random one.
+
+A custom team still counts as the day's one battle and is recorded like any
+other. The editor never changes the battle rules; it only decides the team:
+
+- The site writes the team into the ROM config next to the seed
+  (`customTeam` and `team[6]` in `gDailyRedRomConfig`, laid out in
+  `web/rom-config.js`). `DailyRed_GenerateCustomTeam` in
+  `src/dailyred_team.c` builds each Pokémon with the game's own code and
+  clamps everything to what the game allows (EVs 252 per stat and 510 in all,
+  IVs 0-31, no duplicate moves).
+- The species, move, item and nature lists come from
+  `web/game/editor-data.json`, which `scripts/build-editor-data.mjs` parses
+  from the decomp during `scripts/build-rom.sh`.
+- `cd tests && npm run editor` checks the whole path: the code opens the
+  editor, and the party in game RAM matches what was entered, including the
+  final stats.
+
 ## Known limitations
 
 - **Movement:** running shoes and the bike are off on the summit; it's only
@@ -378,6 +403,7 @@ scripts/get-pokefirered.sh           pinned upstream checkout + patch
 scripts/save-patch.sh                pokefirered/ changes → patches/
 scripts/build-rom.sh                 make modern → web/game/dailyred.gba.gz
 scripts/fetch-vendor.sh              Nostalgist, mGBA core, font (pinned, checksummed)
+scripts/build-editor-data.mjs        species / moves / items for the team editor → web/game/editor-data.json
 scripts/serve.mjs                    local static server
 web/                                 the website
 tests/                               headless browser tests and the teams tool

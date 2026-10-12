@@ -38,6 +38,8 @@ rm -f "$ROOT/web/game/dailyred.gba"
 gzip -9 -n -c "$ROM" > "$ROOT/web/game/dailyred.gba.gz"
 # RED's battle sprite for the site's title card (from the decomp, like the ROM).
 cp "$GAME/graphics/trainers/front_pics/red_front_pic.png" "$ROOT/web/game/red.png"
+# Species, moves and items for the hidden team editor, parsed from the decomp.
+node "$ROOT/scripts/build-editor-data.mjs"
 echo
 echo "Built $ROM"
 echo "Website copy: web/game/dailyred.gba.gz ($(wc -c < "$ROOT/web/game/dailyred.gba.gz" | tr -d ' ') bytes)"

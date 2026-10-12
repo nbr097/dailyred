@@ -7,6 +7,7 @@
     "test": "node smoke.mjs && node site.mjs",
     "smoke": "node smoke.mjs",
     "site": "node site.mjs",
+    "editor": "node editor.mjs",
     "teams": "node teams.mjs"
   },
   "devDependencies": {

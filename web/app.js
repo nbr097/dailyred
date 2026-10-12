@@ -6,6 +6,7 @@ import { Nostalgist } from './vendor/nostalgist.js';
 import { loadGameFiles } from './game-files.js';
 import { injectConfig, parseSeed } from './rom-config.js';
 import { createGameLink, PHASE, RESULT } from './game-link.js';
+import { createTeamEditor, loadCustomTeam, konamiToken } from './team-editor.js';
 import {
   today, dailySeed, msUntilTomorrow, loadStats, resultFor, currentStreaks,
   markBattleStarted, recordResult, settleAbandonedGame,
@@ -27,6 +28,7 @@ const ui = {
   playedResult: $('played-result'),
   playedNext: $('played-next'),
   practiceNote: $('practice-note'),
+  customNote: $('custom-note'),
   loadingText: $('loading-text'),
   loadingDetail: $('loading-detail'),
   meter: $('meter'),
@@ -88,6 +90,7 @@ function renderTitle() {
   ui.play.hidden = Boolean(result);
   ui.played.hidden = !result;
   ui.practiceNote.hidden = !practiceSeed;
+  ui.customNote.hidden = !loadCustomTeam();
   if (result) ui.playedResult.textContent = result === 'won' ? 'You beat RED today!' : 'RED won today.';
   updateCountdown();
 }
@@ -157,9 +160,12 @@ async function startRun() {
       return;
     }
     const seed = practiceSeed ?? dailySeed(runDate);
+    // A team from the hidden editor replaces the random one. It still counts
+    // as the day's battle.
+    const team = loadCustomTeam();
     const rom = practiceSeed
-      ? injectConfig(files.rom, { seed })
-      : injectConfig(files.rom, { seed, wins: stats.wins, battles: stats.wins + stats.losses, daily: true });
+      ? injectConfig(files.rom, { seed, team })
+      : injectConfig(files.rom, { seed, wins: stats.wins, battles: stats.wins + stats.losses, daily: true, team });
 
     ui.loadingText.textContent = 'Starting the emulator';
     ui.loadingDetail.textContent = '';
@@ -270,6 +276,17 @@ document.addEventListener('fullscreenchange', () => {
   ui.fullscreen.textContent = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
 });
 
+// The hidden team editor opens with the Konami code, from the title card only.
+const teamEditor = createTeamEditor({ onChange: renderTitle });
+window.addEventListener('keydown', (event) => {
+  if (app.dataset.state !== 'title' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+  const token = konamiToken(event);
+  if (token) teamEditor.feed(token);
+});
+const feedPad = (token) => {
+  if (app.dataset.state === 'title') teamEditor.feed(token);
+};
+
 // Don't let arrow keys and space scroll the page while playing.
 window.addEventListener('keydown', (event) => {
   if (app.dataset.state === 'playing' && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(event.key)) {
@@ -306,6 +323,7 @@ for (const button of document.querySelectorAll('[data-button]')) {
     event.preventDefault();
     button.setPointerCapture(event.pointerId);
     button.classList.add('is-down');
+    feedPad(button.dataset.button);
     emu?.pressDown(button.dataset.button);
   });
   button.addEventListener('pointerup', release);
@@ -320,7 +338,10 @@ let heldDirection = null;
 function setDirection(next) {
   if (next === heldDirection) return;
   if (heldDirection) emu?.pressUp(heldDirection);
-  if (next) emu?.pressDown(next);
+  if (next) {
+    feedPad(next);
+    emu?.pressDown(next);
+  }
   heldDirection = next;
   dpad.dataset.dir = next ?? '';
 }

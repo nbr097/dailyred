@@ -455,3 +455,66 @@ kbd {
   .card-error .button-play { padding: 12px 32px; font-size: 22px; }
   .toolbar .button { padding: 10px 14px; font-size: 16px; }
 }
+
+/* Hidden team editor (opened with the Konami code) --------------------------- */
+
+.te {
+  width: min(640px, calc(100vw - 2 * var(--gutter)));
+  max-height: calc(100dvh - 2 * var(--gutter));
+  padding: 0;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  color: var(--text);
+  background: var(--page);
+}
+
+.te::backdrop { background: rgba(10, 16, 24, 0.72); }
+
+.te-form { display: flex; flex-direction: column; gap: 14px; padding: 20px; }
+.te-title { margin: 0; font: 600 26px/1.2 var(--font-pixel); }
+.te-note { margin: 0; font-size: 14px; color: var(--muted); }
+.te-message { margin: 0; min-height: 1.4em; font-size: 14px; color: var(--crimson); }
+
+.te-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.te-tab {
+  font: 500 14px/1 var(--font-pixel);
+  padding: 8px 10px;
+  color: inherit;
+  background: none;
+  border: 2px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.te-tab[aria-selected="true"] { color: #fff; background: var(--crimson); border-color: var(--crimson-deep); }
+
+.te-fields { display: flex; flex-direction: column; gap: 12px; }
+.te-row { display: flex; flex-wrap: wrap; gap: 12px; }
+.te-row .te-field { flex: 1 1 200px; }
+.te-field { display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.te-field span { color: var(--muted); }
+
+.te select,
+.te input[type="number"] {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  padding: 8px;
+  color: inherit;
+  background: transparent;
+  border: 2px solid var(--line);
+  border-radius: 6px;
+}
+
+.te-moves { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; }
+.te-moves legend { padding: 0; margin-bottom: 4px; font-size: 14px; color: var(--muted); }
+.te-check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+
+.te-scroll { overflow-x: auto; }
+.te-stats { width: 100%; border-collapse: collapse; font-size: 14px; }
+.te-stats th, .te-stats td { padding: 4px 6px; text-align: left; }
+.te-stats thead th { color: var(--muted); font-weight: 500; }
+.te-stats td:nth-child(n+3) input { width: 5.5em; }
+
+.te-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.te-actions .button-play { padding: 12px 24px; font-size: 20px; }
+.te-actions .button-quiet { border-color: var(--line); }
