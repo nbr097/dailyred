@@ -53,6 +53,11 @@ a { color: inherit; text-underline-offset: 3px; }
 
 [hidden] { display: none !important; }
 
+/* No double-tap zoom: rapid taps should press buttons, not zoom the page.
+   Pinch zoom still works. The game screen takes every touch itself. */
+html, body, .app, button, a { touch-action: manipulation; }
+.screen { touch-action: none; }
+
 :focus-visible {
   outline: 3px solid var(--crimson);
   outline-offset: 3px;
