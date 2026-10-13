@@ -89,7 +89,13 @@
     <footer class="footer">
       <p>Daily Red is a free, unofficial fan project. It isn't affiliated with or endorsed by Nintendo, Creatures Inc., GAME FREAK inc. or The Pokémon Company. Pokémon and all game content are © Nintendo, Creatures Inc. and GAME FREAK inc.</p>
       <p><a href="licenses.txt">Licenses</a> · <a href="https://github.com/amoi-builds/dailyred">Source</a></p>
+      <p class="build" id="build"></p>
     </footer>
   </main>
+  <script>
+    fetch("game/version.txt").then((r) => (r.ok ? r.text() : "")).then((v) => {
+      document.getElementById("build").textContent = v.trim();
+    }).catch(() => {});
+  </script>
 </body>
 </html>

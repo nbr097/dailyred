@@ -40,6 +40,11 @@ gzip -9 -n -c "$ROM" > "$ROOT/web/game/dailyred.gba.gz"
 cp "$GAME/graphics/trainers/front_pics/red_front_pic.png" "$ROOT/web/game/red.png"
 # Species, moves and items for the hidden team editor, parsed from the decomp.
 node "$ROOT/scripts/build-editor-data.mjs"
+# The version shown in the page footer: the commit, with "+" when the tree has
+# uncommitted changes, and the build date.
+VERSION="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+git -C "$ROOT" diff --quiet HEAD 2>/dev/null || VERSION="$VERSION+"
+echo "$VERSION $(date +%Y-%m-%d)" > "$ROOT/web/game/version.txt"
 echo
 echo "Built $ROM"
 echo "Website copy: web/game/dailyred.gba.gz ($(wc -c < "$ROOT/web/game/dailyred.gba.gz" | tr -d ' ') bytes)"
