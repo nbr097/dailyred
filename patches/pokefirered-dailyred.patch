@@ -1,3 +1,44 @@
+diff --git a/asm/macros/battle_script.inc b/asm/macros/battle_script.inc
+index 392a387..b9b1af2 100644
+--- a/asm/macros/battle_script.inc
++++ b/asm/macros/battle_script.inc
+@@ -473,6 +473,14 @@
+ 	.4byte \ptr
+ 	.endm
+ 
++	.macro dailyredreviveparty
++	.byte 0xF8
++	.endm
++
++	.macro dailyredreviveapply
++	.byte 0xF9
++	.endm
++
+ 	.macro openpartyscreen param0:req, param1:req
+ 	.byte 0x50
+ 	.byte \param0
+diff --git a/data/battle_scripts_1.s b/data/battle_scripts_1.s
+index 8aa0a10..23a6159 100644
+--- a/data/battle_scripts_1.s
++++ b/data/battle_scripts_1.s
+@@ -2887,6 +2887,17 @@ BattleScript_FaintedMonSendOutNew::
+ BattleScript_FaintedMonEnd::
+ 	end2
+ 
++@ Daily Red: offers a Max Revive on one fainted Pokemon after RED loses one.
++BattleScript_DailyRedRevive::
++	dailyredreviveparty
++	waitstate
++	dailyredreviveapply
++	jumpifbyte CMP_EQUAL, gBattleCommunication, 0, BattleScript_DailyRedReviveEnd
++	printstring STRINGID_DAILYREDREVIVED
++	waitmessage B_WAIT_TIME_LONG
++BattleScript_DailyRedReviveEnd::
++	end2
++
+ BattleScript_LinkHandleFaintedMonMultiple::
+ 	openpartyscreen BS_FAINTED_LINK_MULTIPLE_1, BattleScript_LinkHandleFaintedMonMultipleStart
+ BattleScript_LinkHandleFaintedMonMultipleStart::
 diff --git a/data/event_scripts.s b/data/event_scripts.s
 index 88d7594..9b6bbdc 100644
 --- a/data/event_scripts.s
@@ -266,6 +307,45 @@ index d880bf6..485a37e 100644
 +	def_special DailyRed_OnDailyGameOver
 +	def_special DailyRed_IsDailyGame
  gSpecialsEnd::
+diff --git a/include/battle.h b/include/battle.h
+index 3771ef3..7bf1585 100644
+--- a/include/battle.h
++++ b/include/battle.h
+@@ -398,6 +398,7 @@ struct BattleStruct
+     bool8 selectionScriptFinished[MAX_BATTLERS_COUNT];
+     u8 battlerPartyIndexes[MAX_BATTLERS_COUNT];
+     u8 monToSwitchIntoId[MAX_BATTLERS_COUNT];
++    u8 dailyRedReviveOffered; // Daily Red: the Max Revive offer was made
+     u8 battlerPartyOrders[MAX_BATTLERS_COUNT][3];
+     u8 runTries;
+     u8 caughtMonNick[POKEMON_NAME_LENGTH + 1];
+diff --git a/include/battle_scripts.h b/include/battle_scripts.h
+index ed2af35..2e8260a 100644
+--- a/include/battle_scripts.h
++++ b/include/battle_scripts.h
+@@ -19,6 +19,7 @@ extern const u8 BattleScript_FaintAttacker[];
+ extern const u8 BattleScript_FaintTarget[];
+ extern const u8 BattleScript_GiveExp[];
+ extern const u8 BattleScript_HandleFaintedMon[];
++extern const u8 BattleScript_DailyRedRevive[];
+ extern const u8 BattleScript_LocalTrainerBattleWon[];
+ extern const u8 BattleScript_LocalTwoTrainersDefeated[];
+ extern const u8 BattleScript_LocalBattleWonLoseTexts[];
+diff --git a/include/constants/battle_string_ids.h b/include/constants/battle_string_ids.h
+index 24cc01c..da1d12a 100644
+--- a/include/constants/battle_string_ids.h
++++ b/include/constants/battle_string_ids.h
+@@ -385,7 +385,9 @@
+ #define STRINGID_TRAINER1MON2COMEBACK 384
+ #define STRINGID_TRAINER1MON1AND2COMEBACK 385
+ 
+-#define BATTLESTRINGS_COUNT     386
++#define STRINGID_DAILYREDREVIVED 386
++
++#define BATTLESTRINGS_COUNT     387
+ 
+ // This is the string id that gBattleStringsTable starts with.
+ // String ids before this (e.g. STRINGID_INTROMSG) are not in the table,
 diff --git a/include/constants/dailyred.h b/include/constants/dailyred.h
 new file mode 100644
 index 0000000..27c41b2
@@ -321,6 +401,18 @@ index 3b893f2..22aae86 100644
  #define MAX_TRAINERS_COUNT                       768
  
  #endif  // GUARD_CONSTANTS_OPPONENTS_H
+diff --git a/include/constants/party_menu.h b/include/constants/party_menu.h
+index 1321a4c..57a6a64 100644
+--- a/include/constants/party_menu.h
++++ b/include/constants/party_menu.h
+@@ -79,6 +79,7 @@
+ #define PARTY_ACTION_CHOOSE_AND_CLOSE   11
+ #define PARTY_ACTION_MOVE_TUTOR         12
+ #define PARTY_ACTION_MINIGAME           13
++#define PARTY_ACTION_DAILYRED_REVIVE    15 // Daily Red: Max Revive offer
+ #define PARTY_ACTION_REUSABLE_ITEM      14
+ 
+ // IDs for DisplayPartyMenuStdMessage, to display the message at the bottom of the party menu
 diff --git a/include/constants/vars.h b/include/constants/vars.h
 index 5c7bbf8..e477fa9 100644
 --- a/include/constants/vars.h
@@ -338,10 +430,10 @@ index 5c7bbf8..e477fa9 100644
  #define VAR_0x402D                         0x402D
 diff --git a/include/dailyred.h b/include/dailyred.h
 new file mode 100644
-index 0000000..2a346d0
+index 0000000..ed3550c
 --- /dev/null
 +++ b/include/dailyred.h
-@@ -0,0 +1,60 @@
+@@ -0,0 +1,63 @@
 +#ifndef GUARD_DAILYRED_H
 +#define GUARD_DAILYRED_H
 +
@@ -362,6 +454,9 @@ index 0000000..2a346d0
 +#include "constants/pokemon.h"
 +
 +#define DAILYRED_BOSS_PARTY_SIZE 6
++
++// A fainted Pokemon that the Max Revive offer can revive.
++bool8 DailyRed_IsRevivable(struct Pokemon *mon);
 +
 +// The boss team (species, IVs, items, moves) and its EV spreads.
 +// Edit src/dailyred_boss.c to change it.
@@ -425,6 +520,92 @@ index 64c9e59..9ade275 100644
      }
  
      return gTrainers[trainerNum].partySize;
+diff --git a/src/battle_message.c b/src/battle_message.c
+index a6392be..baa1b3e 100644
+--- a/src/battle_message.c
++++ b/src/battle_message.c
+@@ -121,6 +121,7 @@ static const u8 sText_PkmnImmobilizedByLove[] = _("{B_ATK_NAME_WITH_PREFIX} is\n
+ static const u8 sText_PkmnBlownAway[] = _("{B_DEF_NAME_WITH_PREFIX} was\nblown away!");
+ static const u8 sText_PkmnChangedType[] = _("{B_ATK_NAME_WITH_PREFIX} transformed\ninto the {B_BUFF1} type!");
+ static const u8 sText_PkmnFlinched[] = _("{B_ATK_NAME_WITH_PREFIX} flinched!");
++static const u8 sText_DailyRedRevived[] = _("{B_BUFF1} was revived\nwith a Max Revive!");
+ static const u8 sText_PkmnRegainedHealth[] = _("{B_DEF_NAME_WITH_PREFIX} regained\nhealth!");
+ static const u8 sText_PkmnHPFull[] = _("{B_DEF_NAME_WITH_PREFIX}'s\nHP is full!");
+ static const u8 sText_PkmnRaisedSpDef[] = _("{B_ATK_PREFIX2}'s {B_CURRENT_MOVE}\nraised SP. DEF!");
+@@ -888,7 +889,8 @@ const u8 *const gBattleStringsTable[BATTLESTRINGS_COUNT - BATTLESTRINGS_TABLE_ST
+     [STRINGID_TRAINER1MON1COMEBACK - BATTLESTRINGS_TABLE_START]          = sText_Trainer1RecallPkmn1,
+     [STRINGID_TRAINER1WINTEXT - BATTLESTRINGS_TABLE_START]               = sText_Trainer1WinText,
+     [STRINGID_TRAINER1MON2COMEBACK - BATTLESTRINGS_TABLE_START]          = sText_Trainer1RecallPkmn2,
+-    [STRINGID_TRAINER1MON1AND2COMEBACK - BATTLESTRINGS_TABLE_START]      = sText_Trainer1RecallBoth
++    [STRINGID_TRAINER1MON1AND2COMEBACK - BATTLESTRINGS_TABLE_START]      = sText_Trainer1RecallBoth,
++    [STRINGID_DAILYREDREVIVED - BATTLESTRINGS_TABLE_START] = sText_DailyRedRevived
+ };
+ 
+ const u16 gMissStringIds[] =
+diff --git a/src/battle_script_commands.c b/src/battle_script_commands.c
+index 67f90a3..6411aad 100644
+--- a/src/battle_script_commands.c
++++ b/src/battle_script_commands.c
+@@ -1,4 +1,5 @@
+ #include "global.h"
++#include "dailyred.h"
+ #include "gflib.h"
+ #include "item.h"
+ #include "util.h"
+@@ -142,6 +143,8 @@ static void Cmd_switchinanim(void);
+ static void Cmd_jumpifcantswitch(void);
+ static void Cmd_openpartyscreen(void);
+ static void Cmd_switchhandleorder(void);
++static void Cmd_dailyredreviveparty(void);
++static void Cmd_dailyredreviveapply(void);
+ static void Cmd_switchineffects(void);
+ static void Cmd_trainerslidein(void);
+ static void Cmd_playse(void);
+@@ -559,6 +562,8 @@ void (* const gBattleScriptingCommandsTable[])(void) =
+     Cmd_removeattackerstatus1,                   //0xF5
+     Cmd_finishaction,                            //0xF6
+     Cmd_finishturn,                              //0xF7
++    Cmd_dailyredreviveparty,                     //0xF8
++    Cmd_dailyredreviveapply,                     //0xF9
+ };
+ 
+ struct StatFractions
+@@ -9884,3 +9889,35 @@ static void Cmd_finishturn(void)
+     gCurrentActionFuncId = B_ACTION_FINISHED;
+     gCurrentTurnActionNumber = gBattlersCount;
+ }
++
++// Daily Red: opens the party in battle so the player can pick a fainted Pokemon
++// for the Max Revive offer, or cancel.
++static void Cmd_dailyredreviveparty(void)
++{
++    gActiveBattler = 0;
++    *(gBattleStruct->battlerPartyIndexes + gActiveBattler) = gBattlerPartyIndexes[gActiveBattler];
++    BtlController_EmitChoosePokemon(BUFFER_A, PARTY_ACTION_DAILYRED_REVIVE, PARTY_SIZE, ABILITY_NONE, gBattleStruct->battlerPartyOrders[gActiveBattler]);
++    MarkBattlerForControllerExec(gActiveBattler);
++    gBattlescriptCurrInstr++;
++}
++
++// Daily Red: revives the Pokemon the player picked. gBattleCommunication[0] is
++// 1 if one was revived and 0 if the player cancelled.
++static void Cmd_dailyredreviveapply(void)
++{
++    u8 slot;
++    u16 maxHp;
++
++    if (gBattleControllerExecFlags)
++        return;
++    gBattleCommunication[0] = 0;
++    slot = gBattleBufferB[0][1];
++    if (gBattleBufferB[0][0] == CONTROLLER_CHOSENMONRETURNVALUE && slot < PARTY_SIZE && DailyRed_IsRevivable(&gPlayerParty[slot]))
++    {
++        maxHp = GetMonData(&gPlayerParty[slot], MON_DATA_MAX_HP);
++        SetMonData(&gPlayerParty[slot], MON_DATA_HP, &maxHp);
++        GetMonNickname(&gPlayerParty[slot], gBattleTextBuff1);
++        gBattleCommunication[0] = 1;
++    }
++    gBattlescriptCurrInstr++;
++}
 diff --git a/src/battle_setup.c b/src/battle_setup.c
 index 6d62084..44f97e4 100644
 --- a/src/battle_setup.c
@@ -452,12 +633,61 @@ index 6d62084..44f97e4 100644
          gBattleTypeFlags |= BATTLE_TYPE_FIRST_BATTLE;
      gMain.savedCallback = CB2_EndTrainerBattle;
      DoTrainerBattle();
+diff --git a/src/battle_util.c b/src/battle_util.c
+index bb66a01..26934a8 100644
+--- a/src/battle_util.c
++++ b/src/battle_util.c
+@@ -12,6 +12,7 @@
+ #include "battle.h"
+ #include "battle_anim.h"
+ #include "battle_scripts.h"
++#include "dailyred.h"
+ #include "battle_message.h"
+ #include "constants/battle_anim.h"
+ #include "battle_controllers.h"
+@@ -1139,6 +1140,27 @@ bool8 HandleWishPerishSongOnTurnEnd(void)
+     return FALSE;
+ }
+ 
++// Daily Red: after RED loses a Pokemon, the player may use a Max Revive on one
++// of their fainted Pokemon. Offered once per battle, and only when the player has
++// a fainted Pokemon to revive.
++static bool8 DailyRedOfferMaxRevive(void)
++{
++    s32 i;
++
++    if (gBattleStruct->dailyRedReviveOffered || gBattleResults.opponentFaintCounter == 0 || gBattleOutcome != 0)
++        return FALSE;
++    gBattleStruct->dailyRedReviveOffered = TRUE;
++    for (i = 0; i < PARTY_SIZE; i++)
++    {
++        if (DailyRed_IsRevivable(&gPlayerParty[i]))
++        {
++            BattleScriptExecute(BattleScript_DailyRedRevive);
++            return TRUE;
++        }
++    }
++    return FALSE;
++}
++
+ #define FAINTED_ACTIONS_MAX_CASE 7
+ 
+ bool8 HandleFaintedMonActions(void)
+@@ -1206,6 +1228,8 @@ bool8 HandleFaintedMonActions(void)
+                 gBattleStruct->faintedActionsState = 4;
+             break;
+         case 6:
++            if (DailyRedOfferMaxRevive())
++                return TRUE;
+             if (AbilityBattleEffects(ABILITYEFFECT_INTIMIDATE1, 0, 0, 0, 0)
+              || AbilityBattleEffects(ABILITYEFFECT_TRACE, 0, 0, 0, 0)
+              || ItemBattleEffects(ITEMEFFECT_NORMAL, 0, TRUE)
 diff --git a/src/dailyred.c b/src/dailyred.c
 new file mode 100644
-index 0000000..8e0e992
+index 0000000..ff9f50d
 --- /dev/null
 +++ b/src/dailyred.c
-@@ -0,0 +1,241 @@
+@@ -0,0 +1,249 @@
 +#include "global.h"
 +#include "gflib.h"
 +#include "dailyred.h"
@@ -698,6 +928,14 @@ index 0000000..8e0e992
 +            SetMonData(&party[i], MON_DATA_HP_EV + stat, &gDailyRedBossEVs[i][stat]);
 +        CalculateMonStats(&party[i]);
 +    }
++}
++
++// A fainted Pokemon that the Max Revive offer can revive.
++bool8 DailyRed_IsRevivable(struct Pokemon *mon)
++{
++    return GetMonData(mon, MON_DATA_SPECIES) != SPECIES_NONE
++        && !GetMonData(mon, MON_DATA_IS_EGG)
++        && GetMonData(mon, MON_DATA_HP) == 0;
 +}
 diff --git a/src/dailyred_boss.c b/src/dailyred_boss.c
 new file mode 100644
@@ -1564,10 +1802,37 @@ index 339014d..372a951 100644
      ScriptContext_Init();
      UnlockPlayerFieldControls();
 diff --git a/src/party_menu.c b/src/party_menu.c
-index 7f3a881..d072abe 100644
+index 7f3a881..37d1489 100644
 --- a/src/party_menu.c
 +++ b/src/party_menu.c
-@@ -2962,28 +2962,12 @@ static void SetPartyMonSelectionActions(struct Pokemon *mons, u8 slotId, u8 acti
+@@ -6,6 +6,7 @@
+ #include "battle_gfx_sfx_util.h"
+ #include "battle_interface.h"
+ #include "battle_tower.h"
++#include "dailyred.h"
+ #include "berry_pouch.h"
+ #include "data.h"
+ #include "decompress.h"
+@@ -1206,6 +1207,18 @@ static void HandleChooseMonSelection(u8 taskId, s8 *slotPtr)
+             if (IsSelectedMonNotEgg((u8 *)slotPtr))
+                 TryEnterMonForMinigame(taskId, (u8)*slotPtr);
+             break;
++        case PARTY_ACTION_DAILYRED_REVIVE:
++            if (DailyRed_IsRevivable(&gPlayerParty[*slotPtr]))
++            {
++                PlaySE(SE_SELECT);
++                gSelectedMonPartyId = *slotPtr;
++                gPartyMenuUseExitCallback = TRUE;
++                sPartyMenuInternal->exitCallback = CB2_SetUpExitToBattleScreen;
++                Task_ClosePartyMenu(taskId);
++            }
++            else
++                PlaySE(SE_FAILURE);
++            break;
+         default:
+         case PARTY_ACTION_ABILITY_PREVENTS:
+         case PARTY_ACTION_SWITCHING:
+@@ -2962,28 +2975,12 @@ static void SetPartyMonSelectionActions(struct Pokemon *mons, u8 slotId, u8 acti
  
  static void SetPartyMonFieldSelectionActions(struct Pokemon *mons, u8 slotId)
  {
