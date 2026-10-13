@@ -89,6 +89,16 @@ function clamp(value, min, max, fallback) {
   return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
 }
 
+// Lower-case, no accents or punctuation, so "pokemon", "Mr. Mime" and
+// "mr mime" all match. Applied to both the search text and the names.
+function normalize(text) {
+  return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function search(id, placeholder) {
+  return el('input', { type: 'search', id, placeholder, autocomplete: 'off', autocapitalize: 'off', spellcheck: false });
+}
+
 export function createTeamEditor({ onChange = () => {} } = {}) {
   let data = null;
   let speciesById = null;
@@ -100,7 +110,29 @@ export function createTeamEditor({ onChange = () => {} } = {}) {
   let dialog = null;
   const parts = {};
 
+  // Each dropdown keeps its full list in `lists`. A search box, if it has one,
+  // narrows the options shown. Items are [value, label, normalized name].
+  const lists = new Map();
+  const searches = new Map();
+
   const current = () => team[slot];
+
+  function setOptions(select, items, selected) {
+    lists.set(select, items);
+    drawOptions(select, selected);
+  }
+
+  // Shows the matching options and always keeps the chosen one, so the
+  // select never shows a blank value.
+  function drawOptions(select, selected = Number(select.value)) {
+    const query = normalize(searches.get(select)?.value ?? '');
+    const items = lists.get(select);
+    const shown = items.filter(([, , name], i) => i === 0 || !query || name.includes(query));
+    const chosen = items.find(([value]) => value === selected);
+    if (chosen && !shown.includes(chosen)) shown.push(chosen);
+    select.replaceChildren(...shown.map(([value, label]) => option(value, label)));
+    select.value = String(selected);
+  }
 
   async function loadData() {
     loading ??= fetch('game/editor-data.json').then((res) => {
@@ -116,12 +148,24 @@ export function createTeamEditor({ onChange = () => {} } = {}) {
 
   function build() {
     parts.tabs = el('div', { className: 'te-tabs', role: 'tablist' });
-    parts.species = el('select', { id: 'te-species' }, option(0, '(empty slot)'), ...data.species.map((s) => option(s.id, s.name)));
+    parts.speciesSearch = search('te-species-search', 'Type a Pokémon name');
+    parts.species = el('select', { id: 'te-species' });
     parts.level = el('input', { id: 'te-level', type: 'number', min: 1, max: 100, inputMode: 'numeric' });
     parts.nature = el('select', { id: 'te-nature' }, ...data.natures.map((n, i) => option(i, n)));
-    parts.item = el('select', { id: 'te-item' }, option(0, '(none)'), ...data.items.map((i) => option(i.id, i.name)));
+    parts.itemSearch = search('te-item-search', 'Type an item name');
+    parts.item = el('select', { id: 'te-item' });
     parts.allMoves = el('input', { id: 'te-all-moves', type: 'checkbox' });
+    parts.moveSearch = search('te-move-search', 'Type a move name');
     parts.moves = [0, 1, 2, 3].map((i) => el('select', { id: `te-move-${i}`, ariaLabel: `Move ${i + 1}` }));
+
+    searches.set(parts.species, parts.speciesSearch);
+    searches.set(parts.item, parts.itemSearch);
+    parts.moves.forEach((select) => searches.set(select, parts.moveSearch));
+    setOptions(parts.species, [[0, '(empty slot)', ''], ...data.species.map((s) => [s.id, s.name, normalize(s.name)])], 0);
+    setOptions(parts.item, [[0, '(none)', ''], ...data.items.map((i) => [i.id, i.name, normalize(i.name)])], 0);
+    parts.speciesSearch.addEventListener('input', () => drawOptions(parts.species));
+    parts.itemSearch.addEventListener('input', () => drawOptions(parts.item));
+    parts.moveSearch.addEventListener('input', () => parts.moves.forEach((select) => drawOptions(select)));
     parts.ivs = STATS.map((name) => el('input', { type: 'number', min: 0, max: 31, inputMode: 'numeric', ariaLabel: `${name} IV` }));
     parts.evs = STATS.map((name) => el('input', { type: 'number', min: 0, max: MAX_EV, step: 4, inputMode: 'numeric', ariaLabel: `${name} EV` }));
     parts.bases = STATS.map(() => el('span'));
@@ -134,10 +178,12 @@ export function createTeamEditor({ onChange = () => {} } = {}) {
     const label = (text, input) => el('label', { className: 'te-field' }, el('span', { textContent: text }), input);
 
     parts.fields = el('div', { className: 'te-fields' },
-      el('div', { className: 'te-row' }, label('Pokémon', parts.species), label('Level', parts.level)),
-      el('div', { className: 'te-row' }, label('Nature', parts.nature), label('Held item', parts.item)),
+      el('div', { className: 'te-row' }, label('Find a Pokémon', parts.speciesSearch), label('Pokémon', parts.species)),
+      el('div', { className: 'te-row' }, label('Level', parts.level), label('Nature', parts.nature)),
+      el('div', { className: 'te-row' }, label('Find a held item', parts.itemSearch), label('Held item', parts.item)),
       el('fieldset', { className: 'te-moves' },
         el('legend', { textContent: 'Moves' }),
+        label('Find a move', parts.moveSearch),
         ...parts.moves,
         el('label', { className: 'te-check' }, parts.allMoves, el('span', { textContent: 'Allow moves this Pokémon can’t learn' }))),
       el('div', { className: 'te-scroll' }, el('table', { className: 'te-stats' },
@@ -223,11 +269,11 @@ export function createTeamEditor({ onChange = () => {} } = {}) {
     const byId = new Map(data.moves.map((m) => [m.id, m]));
     const pool = allMoves || !info ? data.moves : info.moves.map((id) => byId.get(id)).filter(Boolean);
     const label = (m) => `${m.name} (${m.type[0]}${m.type.slice(1).toLowerCase()}${m.power ? `, ${m.power}` : ''})`;
+    const items = [[0, '(none)', ''], ...pool.map((m) => [m.id, label(m), normalize(m.name)])];
     parts.moves.forEach((select, i) => {
-      select.replaceChildren(option(0, '(none)'), ...pool.map((m) => option(m.id, label(m))));
       // Keep a move chosen earlier even when it is outside the list.
-      if (mon.moves[i] && !pool.some((m) => m.id === mon.moves[i]) && byId.has(mon.moves[i])) select.append(option(mon.moves[i], label(byId.get(mon.moves[i]))));
-      select.value = String(mon.moves[i]);
+      const kept = mon.moves[i] && !pool.some((m) => m.id === mon.moves[i]) && byId.has(mon.moves[i]) ? byId.get(mon.moves[i]) : null;
+      setOptions(select, kept ? [...items, [kept.id, label(kept), normalize(kept.name)]] : items, mon.moves[i]);
     });
   }
 
@@ -248,10 +294,12 @@ export function createTeamEditor({ onChange = () => {} } = {}) {
     const mon = current();
     const info = mon.species ? speciesById.get(mon.species) : null;
     if (full) {
-      parts.species.value = String(mon.species);
+      // A new slot starts with the full lists, not the last search.
+      for (const box of searches.values()) box.value = '';
+      drawOptions(parts.species, mon.species);
       parts.level.value = mon.level;
       parts.nature.value = String(mon.nature);
-      parts.item.value = String(mon.item);
+      drawOptions(parts.item, mon.item);
       parts.allMoves.checked = allMoves;
       parts.ivs.forEach((input, i) => { input.value = mon.ivs[i]; });
       parts.evs.forEach((input, i) => { input.value = mon.evs[i]; });

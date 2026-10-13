@@ -466,6 +466,8 @@ kbd {
 .te {
   width: min(640px, calc(100vw - 2 * var(--gutter)));
   max-height: calc(100dvh - 2 * var(--gutter));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 0;
   border: 2px solid var(--line);
   border-radius: 12px;
@@ -498,17 +500,25 @@ kbd {
 .te-field { display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
 .te-field span { color: var(--muted); }
 
+/* 16px or more: iOS zooms the page when a smaller field is focused, and
+   then the page is left zoomed in. */
 .te select,
-.te input[type="number"] {
+.te input[type="number"],
+.te input[type="search"] {
   width: 100%;
   min-width: 0;
   font: inherit;
-  padding: 8px;
+  font-size: 16px;
+  padding: 10px 8px;
   color: inherit;
   background: transparent;
   border: 2px solid var(--line);
   border-radius: 6px;
 }
+
+.te input[type="search"] { -webkit-appearance: none; appearance: none; }
+.te input[type="search"]::-webkit-search-cancel-button { cursor: pointer; }
+.te *, .te *::before, .te *::after { touch-action: manipulation; }
 
 .te-moves { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; }
 .te-moves legend { padding: 0; margin-bottom: 4px; font-size: 14px; color: var(--muted); }
@@ -523,3 +533,15 @@ kbd {
 .te-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .te-actions .button-play { padding: 12px 24px; font-size: 20px; }
 .te-actions .button-quiet { border-color: var(--line); }
+
+@media (max-width: 560px) {
+  .te-form { gap: 12px; padding: 16px; }
+  .te-title { font-size: 22px; }
+  .te-row, .te-row .te-field { flex-basis: 100%; }
+  .te-tab { font-size: 13px; padding: 8px; }
+  .te-stats th, .te-stats td { padding: 4px 3px; }
+  .te-stats td:nth-child(n+3) input { width: 4.5em; }
+  .te-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .te-actions .button { width: 100%; }
+  .te-actions .button-play { grid-column: 1 / -1; }
+}
