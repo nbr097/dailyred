@@ -452,6 +452,22 @@ kbd {
 
 @media (max-width: 640px) {
   .app { padding-top: 24px; }
+  .masthead { margin-bottom: 16px; }
+  .toolbar { margin-top: 10px; }
+  .pad { margin-top: 8px; padding: 8px 8px 0; gap: 10px 8px; }
+  .dpad { width: 120px; height: 120px; }
+  .dpad-up, .dpad-down, .dpad-left, .dpad-right, .dpad-center { width: 40px; height: 40px; }
+  .dpad-up, .dpad-down { left: 40px; }
+  .dpad-left, .dpad-right { top: 40px; }
+  .dpad-center { left: 40px; top: 40px; }
+  .dpad-right { right: 0; }
+  .pad-button { width: 60px; height: 60px; }
+  .pad-a { transform: translateY(-14px); }
+  .guide { margin-top: 24px; padding-top: 20px; }
+  .guide-heading { margin-bottom: 8px; }
+  .keys div { grid-template-columns: 1fr; gap: 4px; padding: 4px 0; }
+  .keys dd { font-size: 15px; }
+  .footer { margin-top: 24px; padding-top: 16px; }
   .title { font-size: 44px; }
   .bezel { padding: 5px; border-radius: 10px; }
   .card-loading, .card-error { gap: 12px; padding: 16px; }
